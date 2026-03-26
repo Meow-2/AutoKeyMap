@@ -150,7 +150,7 @@ Class IME {
 ;     return
 ; }
 
-RAlt:: {
+$RAlt:: {
     try{
         ime_status := IME.isEnglishMode()
         ; 如果当前是微软拼音中文模式
