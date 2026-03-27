@@ -2,8 +2,21 @@
 #SingleInstance Force
 ;#UseHook
 
-; 右 Alt → Ctrl + Space（右Alt切换输入法旧方案，已弃用）
-; RAlt::^Space
+; WPS这类RAlt被占用的编辑器里，直接走 IME 消息切换不稳定，
+; 因此在这些进程中会退回为“发送一个按键”来触发输入法切换。
+; 可选示例：
+;   global ImeToggleKey := "{Shift}"  ; 发送 Shift
+;   global ImeToggleKey := "{Ctrl}"   ; 发送 Ctrl
+;   global ImeToggleKey := "^ "       ; 发送 Ctrl+Space
+; 输入法布局 ID 也抽成全局配置，便于换机器后直接调整。
+; 如果换机器后不生效，可先用 Win+Shift+X 查看当前窗口的 Layout ID，
+; RAltOccupiedApps 用于配置“RAlt 被应用占用”的进程名列表。
+global ImeToggleKey := "{Shift}"
+global EnglishLayoutId := 67699721
+global ChineseLayoutId := 134481924
+global RAltOccupiedApps := ["wps.exe", "et.exe", "wpp.exe", "excel.exe"]
+global DebugInfoGui := 0
+global DebugInfoEdit := 0
 
 ; 将对应的软件固定到任务栏对应位置，win+1为微信，win+2为企业微信
 ; --- Win + 键 映射（并屏蔽系统行为） ---
@@ -16,8 +29,8 @@
 #g::Send("#{8}")      ; Win+G → Win+8 打开Dbeaver
 #m::Send("#{9}")      ; Win+M → Win+9 打开QQMusic
 
-; --- Win + P → 打开程序 ---
-#p::Run("C:\Users\14085\scoop\apps\postman\current\app\Postman.exe") ; 打开Postman
+; --- Win + P → 打开Postman程序 ---
+#p::Run(EnvGet("USERPROFILE") "\scoop\apps\postman\current\app\Postman.exe") ; 打开Postman
 
 ; IME状态读取和切换，支持微软拼音中英文状态的切换
 ; 输入法智能切换中英文，用autohotkey如何实现？ - 龍林的回答 - 知乎 https://www.zhihu.com/question/41446565/answer/43058791607
@@ -100,8 +113,8 @@ Class IME {
         DllCall("GetWindowThreadProcessId", "UInt", WinGetID("A"), "UInt", 0))
 
     static keyboardLayoutID := Map(
-        "en", 67699721, ; 美式键盘布局ID
-        "ch", 134481924, ; 微软拼音输入法布局ID
+        "en", EnglishLayoutId, ; 美式键盘布局ID
+        "ch", ChineseLayoutId, ; 微软拼音输入法布局ID
         ; more language
     )
 
@@ -142,16 +155,27 @@ Class IME {
     }
 }
 
-; 获取当前活动窗口的输入法布局ID
-; F1::  ; 按 F1 键时显示
-; {
-;     id := IME.isEnglishMode()
-;     MsgBox "当前输入法布局ID: " id
-;     return
-; }
+isRAltOccupiedApp() {
+    try {
+        process_name := StrLower(WinGetProcessName("A"))
+        for app in RAltOccupiedApps {
+            if (process_name = StrLower(app))
+                return True
+        }
+        return False
+    }
+    catch {
+        return False
+    }
+}
 
-$RAlt:: {
-    try{
+RAlt:: {
+    try {
+        if isRAltOccupiedApp() {
+            ; RAlt 被应用占用时，优先走可配置按键，兼容性比直接发 IME 消息更稳。
+            Send(ImeToggleKey)
+            return
+        }
         ime_status := IME.isEnglishMode()
         ; 如果当前是微软拼音中文模式
         if (ime_status == 0) {
@@ -181,4 +205,67 @@ $RAlt:: {
     catch {
         return
     }
+}
+
+hideDebugInfoGui(*) {
+    global DebugInfoGui
+    if IsObject(DebugInfoGui) {
+        DebugInfoGui.Hide()
+    }
+}
+
+showDebugToolTip(text, timeout := 1500, whichToolTip := 4) {
+    global DebugInfoGui, DebugInfoEdit
+
+    if !IsObject(DebugInfoGui) {
+        DebugInfoGui := Gui("+AlwaysOnTop +ToolWindow +Border", "AKM Debug")
+        DebugInfoGui.MarginX := 10
+        DebugInfoGui.MarginY := 10
+        DebugInfoGui.BackColor := "F7F7F7"
+        DebugInfoGui.SetFont("s10", "Consolas")
+
+        DebugInfoEdit := DebugInfoGui.AddEdit("xm ym w620 r12 ReadOnly -Wrap")
+        DebugInfoGui.OnEvent("Close", hideDebugInfoGui)
+        DebugInfoGui.OnEvent("Escape", hideDebugInfoGui)
+    }
+
+    DebugInfoEdit.Value := text
+    ; timeout/whichToolTip 参数保留，仅为兼容现有调用点；当前策略是手动关闭。
+    DebugInfoGui.Show("AutoSize x10 y10")
+}
+
+showActiveWindowInfo() {
+    try {
+        hwnd := WinGetID("A")
+        process_name := WinGetProcessName("ahk_id " hwnd)
+        title := WinGetTitle("ahk_id " hwnd)
+        class_name := WinGetClass("ahk_id " hwnd)
+        layout_id := IME.get()
+        ime_mode := IME.isEnglishMode()
+        ralt_occupied := isRAltOccupiedApp() ? "In Config List" : "Not In Config List"
+        info := "Process: " process_name
+            . "`nTitle: " (title != "" ? title : "<untitled>")
+            . "`nClass: " class_name
+            . "`nHWND: " hwnd
+            . "`nIME Layout ID: " layout_id
+            . "`nIME Mode(en:1 zh:0): " ime_mode
+            . "`nAKM EN ID Config: " EnglishLayoutId
+            . "`nAKM CH ID Config: " ChineseLayoutId
+            . "`nAKM Toggle Key Config: " ImeToggleKey
+            . "`nRAlt Occupation List Config: " ralt_occupied
+        showDebugToolTip(info, 5000, 5)
+    }
+    catch Error as err {
+        showDebugToolTip("Window info failed: " err.Message, 5000, 5)
+    }
+}
+
+; 调试说明：
+; 1. Win+Shift+X 会显示当前活动窗口信息、当前 Layout ID、配置中的 EN/CH Layout ID、
+;    当前 IME Mode，以及 RAlt 占用分支会发送的 ImeToggleKey。
+; 2. 如果你只想快速看当前活动窗口的输入法布局 ID，可以临时取消下面 F1 热键的注释。
+; 3. 当 Win+Shift+X 里的 Layout ID 与 EnglishLayoutId / ChineseLayoutId 不一致时，
+;    说明这台机器的输入法布局 ID 和当前脚本配置不一致，需要更新全局变量。
++#x:: {
+    showActiveWindowInfo()
 }
