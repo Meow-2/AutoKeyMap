@@ -1,6 +1,10 @@
 ; 将对应的软件固定到任务栏对应位置，win+1为微信，win+2为企业微信
 ; --- Win + 键 映射（并屏蔽系统行为） ---
-#q::Send("!{F4}")     ; Win+Q → Alt+F4 关闭活动窗口
+#q:: {
+    closing_hwnd := WinGetID("A")
+    Send("!{F4}")
+    activateTopWindowAfterClose(closing_hwnd)
+}
 #Enter::Send("#{3}")  ; Win+Enter → Win+3 打开终端
 #c::Send("#{4}")      ; Win+C → Win+4 打开浏览器
 #i::Send("#{5}")      ; Win+I → Win+5 打开IDEA
