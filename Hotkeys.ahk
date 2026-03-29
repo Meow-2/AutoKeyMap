@@ -5,16 +5,16 @@
     Send("!{F4}")
     activateTopWindowAfterClose(closing_hwnd)
 }
-#Enter::Send("#{3}")  ; Win+Enter → Win+3 打开终端
-#c::Send("#{4}")      ; Win+C → Win+4 打开浏览器
-#i::Send("#{5}")      ; Win+I → Win+5 打开IDEA
-#w::Send("#{6}")      ; Win+W → Win+6 打开WebStorm
-#o::Send("#{7}")      ; Win+O → Win+7 打开Zed
-#g::Send("#{8}")      ; Win+G → Win+8 打开Dbeaver
-#m::Send("#{9}")      ; Win+M → Win+9 打开QQMusic
+#Enter::openPinnedAppAndFocus(3)  ; Win+Enter → Win+3 打开终端并激活
+#c::openPinnedAppAndFocus(4)      ; Win+C → Win+4 打开浏览器并激活
+#i::openPinnedAppAndFocus(5)      ; Win+I → Win+5 打开IDEA并激活
+#w::openPinnedAppAndFocus(6)      ; Win+W → Win+6 打开WebStorm并激活
+#o::openPinnedAppAndFocus(7)      ; Win+O → Win+7 打开Zed并激活
+#g::openPinnedAppAndFocus(8)      ; Win+G → Win+8 打开Dbeaver并激活
+#m::openPinnedAppAndFocus(9)      ; Win+M → Win+9 打开QQMusic并激活
 
 ; --- Win + P → 打开Postman程序 ---
-#p::Run(EnvGet("USERPROFILE") "\scoop\apps\postman\current\app\Postman.exe")
+#p::runAppAndFocus(EnvGet("USERPROFILE") "\scoop\apps\postman\current\app\Postman.exe")
 
 RAlt:: {
     try {
